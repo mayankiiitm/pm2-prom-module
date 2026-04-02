@@ -45,7 +45,7 @@ const detectActiveApps = () => {
         const mapAppPids = {};
         const activePM2Ids = new Set();
         apps.forEach((appInstance) => {
-            var _a;
+            var _a, _b;
             const pm2_env = appInstance.pm2_env;
             const appName = appInstance.name;
             if (!isMonitoringApp(appInstance) || !appName || appInstance.pm_id === undefined) {
@@ -62,27 +62,33 @@ const detectActiveApps = () => {
                 mapAppPids[appName].restartsSum + Number(pm2_env.restart_time || 0);
             // Get the last app instance status
             mapAppPids[appName].status = (_a = appInstance.pm2_env) === null || _a === void 0 ? void 0 : _a.status;
-            if (appInstance.pm_id !== undefined) {
-                if (appInstance.pid) {
-                    mapAppPids[appName].pids.push(appInstance.pid);
-                }
+            if (appInstance.pid && appInstance.pm_id !== undefined) {
+                mapAppPids[appName].pids.push(appInstance.pid);
                 // Fill active pm2 apps id to collect internal statistic
                 if (pm2_env.status === 'online') {
                     activePM2Ids.add(appInstance.pm_id);
                 }
-                // Use pid as key for running processes, negative pm_id for stopped/errored
-                const monitKey = appInstance.pid || -(appInstance.pm_id + 1);
                 // Fill monitoring data
-                pidsMonit[monitKey] = {
+                pidsMonit[appInstance.pid] = {
                     cpu: 0,
                     memory: 0,
                     pmId: appInstance.pm_id,
-                    id: appInstance.pid || 0,
+                    id: appInstance.pid,
                     restartCount: pm2_env.restart_time || 0,
                     createdAt: pm2_env.created_at || 0,
                     metrics: pm2_env.axm_monitor,
                     status: pm2_env.status,
                 };
+            }
+            // Track per-instance status separately (includes stopped/errored with pid=0)
+            if (appInstance.pm_id !== undefined) {
+                const statusMap = {
+                    'online': 1, 'one-launch-status': 1,
+                    'launching': 2, 'stopping': 2,
+                    'stopped': 3,
+                    'errored': 4,
+                };
+                metrics_1.metricAppPidsStatus === null || metrics_1.metricAppPidsStatus === void 0 ? void 0 : metrics_1.metricAppPidsStatus.set({ app: appName, instance: appInstance.pm_id }, (_b = statusMap[pm2_env.status]) !== null && _b !== void 0 ? _b : 0);
             }
         });
         Object.keys(APPS).forEach((appName) => {
@@ -262,9 +268,6 @@ function processWorkingApp(workingApp) {
     });
     workingApp.getRestartCount().forEach((entry) => {
         metrics_1.metricAppRestartCount === null || metrics_1.metricAppRestartCount === void 0 ? void 0 : metrics_1.metricAppRestartCount.set(Object.assign(Object.assign({}, labels), { instance: entry.pmId }), entry.value);
-    });
-    workingApp.getPidStatuses().forEach((entry) => {
-        metrics_1.metricAppPidsStatus === null || metrics_1.metricAppPidsStatus === void 0 ? void 0 : metrics_1.metricAppPidsStatus.set(Object.assign(Object.assign({}, labels), { instance: entry.pmId }), entry.value);
     });
     workingApp.getPidPm2Metrics().forEach((entry) => {
         Object.keys(entry.metrics).forEach((metricKey) => {
