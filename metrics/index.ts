@@ -25,6 +25,7 @@ const METRIC_APP_PIDS_CPU_THRESHOLD = 'app_pids_cpu_threshold';
 const METRIC_APP_RESTART_COUNT = 'app_restart_count';
 const METRIC_APP_UPTIME = 'app_uptime';
 const METRIC_APP_STATUS = 'app_status';
+const METRIC_APP_PIDS_STATUS = 'app_pids_status';
 const METRIC_TOTAL_MEMORY_CONTAINER = 'container_total_memory';
 const METRIC_FREE_MEMORY_CONTAINER = 'container_free_memory';
 const METRIC_USED_MEMORY_CONTAINER = 'container_used_memory';
@@ -43,6 +44,7 @@ export let metricAppRestartCount: client.Gauge | undefined;
 export let metricAppUptime: client.Gauge | undefined;
 export let metricAppPidsMemory: client.Gauge | undefined;
 export let metricAppStatus: client.Gauge | undefined;
+export let metricAppPidsStatus: client.Gauge | undefined;
 
 let currentPrefix = '';
 
@@ -175,6 +177,13 @@ export const initMetrics = (prefix: string) => {
         labelNames: ['app'],
     });
 
+    metricAppPidsStatus = new client.Gauge({
+        name: `${prefix}_${METRIC_APP_PIDS_STATUS}`,
+        help: 'Current status per app instance. (0-unknown,1-running,2-pending,3-stopped,4-errored)',
+        registers: [registry],
+        labelNames: ['app', 'instance'],
+    });
+
     // Metrics with instances
 
     metricAppPidsCpuLast = new client.Gauge({
@@ -244,6 +253,7 @@ export const deletePromAppInstancesMetrics = (appName: string, instances: number
         metricAppPidsCpuThreshold?.remove({ app: appName, instance: pmId });
         metricAppRestartCount?.remove({ app: appName, instance: pmId });
         metricAppPidsMemory?.remove({ app: appName, instance: pmId });
+        metricAppPidsStatus?.remove({ app: appName, instance: pmId });
 
         for (const [, entry] of Object.entries(dynamicGaugeMetricClients)) {
             entry?.remove({ app: appName, instance: pmId });

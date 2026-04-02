@@ -19,6 +19,7 @@ import {
     metricAppPidsMemory,
     metricAppPidsCpuThreshold,
     metricAppStatus,
+    metricAppPidsStatus,
     deletePromAppMetrics,
     deletePromAppInstancesMetrics,
 } from '../metrics';
@@ -336,6 +337,10 @@ function processWorkingApp(workingApp: App) {
 
     workingApp.getRestartCount().forEach((entry) => {
         metricAppRestartCount?.set({ ...labels, instance: entry.pmId }, entry.value);
+    });
+
+    workingApp.getPidStatuses().forEach((entry) => {
+        metricAppPidsStatus?.set({ ...labels, instance: entry.pmId }, entry.value);
     });
 
     workingApp.getPidPm2Metrics().forEach((entry) => {

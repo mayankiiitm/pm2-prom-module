@@ -264,6 +264,38 @@ export class App {
         return Object.keys(this.pids).length;
     }
 
+    getPidStatuses() {
+        const values: { pid: string; value: number; pmId: number }[] = [];
+
+        for (const [pid, entry] of Object.entries(this.pids)) {
+            let statusValue = APP_STATUS.UNKNOWN;
+            switch (entry.status) {
+                case 'online':
+                case 'one-launch-status':
+                    statusValue = APP_STATUS.RUNNING;
+                    break;
+                case 'errored':
+                    statusValue = APP_STATUS.ERRORED;
+                    break;
+                case 'stopped':
+                    statusValue = APP_STATUS.STOPPED;
+                    break;
+                case 'launching':
+                case 'stopping':
+                    statusValue = APP_STATUS.PENDING;
+                    break;
+            }
+
+            values.push({
+                pid,
+                pmId: entry.pmId,
+                value: statusValue,
+            });
+        }
+
+        return values;
+    }
+
     getUptime() {
         if (Object.keys(this.pids).length === 0) {
             return 0;
