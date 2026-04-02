@@ -113,7 +113,7 @@ const detectActiveApps = () => {
                     cpu: 0,
                     memory: 0,
                     pmId: appInstance.pm_id,
-                    id: appInstance.pid,
+                    id: appInstance.pid || 0,
                     restartCount: pm2_env.restart_time || 0,
                     createdAt: pm2_env.created_at || 0,
                     metrics: pm2_env.axm_monitor,
