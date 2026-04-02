@@ -62,14 +62,18 @@ const detectActiveApps = () => {
                 mapAppPids[appName].restartsSum + Number(pm2_env.restart_time || 0);
             // Get the last app instance status
             mapAppPids[appName].status = (_a = appInstance.pm2_env) === null || _a === void 0 ? void 0 : _a.status;
-            if (appInstance.pid && appInstance.pm_id !== undefined) {
-                mapAppPids[appName].pids.push(appInstance.pid);
+            if (appInstance.pm_id !== undefined) {
+                if (appInstance.pid) {
+                    mapAppPids[appName].pids.push(appInstance.pid);
+                }
                 // Fill active pm2 apps id to collect internal statistic
                 if (pm2_env.status === 'online') {
                     activePM2Ids.add(appInstance.pm_id);
                 }
+                // Use pid as key for running processes, negative pm_id for stopped/errored
+                const monitKey = appInstance.pid || -(appInstance.pm_id + 1);
                 // Fill monitoring data
-                pidsMonit[appInstance.pid] = {
+                pidsMonit[monitKey] = {
                     cpu: 0,
                     memory: 0,
                     pmId: appInstance.pm_id,
