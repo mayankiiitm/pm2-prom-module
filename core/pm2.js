@@ -39,11 +39,13 @@ const updateAppPidsData = (workingApp, pidData) => {
 const detectActiveApps = () => {
     const logger = (0, logger_1.getLogger)();
     pm2_1.default.list((err, apps) => {
+        var _a;
         if (err)
             return console.error(err.stack || err);
         const pidsMonit = {};
         const mapAppPids = {};
         const activePM2Ids = new Set();
+        const currentPidStatuses = new Map(); // "app:pm_id" → status
         apps.forEach((appInstance) => {
             var _a, _b;
             const pm2_env = appInstance.pm2_env;
@@ -80,7 +82,7 @@ const detectActiveApps = () => {
                     status: pm2_env.status,
                 };
             }
-            // Track per-instance status separately (includes stopped/errored with pid=0)
+            // Track per-instance status (includes stopped/errored with pid=0)
             if (appInstance.pm_id !== undefined) {
                 const statusMap = {
                     'online': 1, 'one-launch-status': 1,
@@ -88,9 +90,26 @@ const detectActiveApps = () => {
                     'stopped': 3,
                     'errored': 4,
                 };
-                metrics_1.metricAppPidsStatus === null || metrics_1.metricAppPidsStatus === void 0 ? void 0 : metrics_1.metricAppPidsStatus.set({ app: appName, instance: appInstance.pm_id }, (_b = statusMap[pm2_env.status]) !== null && _b !== void 0 ? _b : 0);
+                const statusValue = (_b = statusMap[pm2_env.status]) !== null && _b !== void 0 ? _b : 0;
+                metrics_1.metricAppPidsStatus === null || metrics_1.metricAppPidsStatus === void 0 ? void 0 : metrics_1.metricAppPidsStatus.set({ app: appName, instance: appInstance.pm_id }, statusValue);
+                currentPidStatuses.set(`${appName}:${appInstance.pm_id}`, statusValue);
             }
         });
+        // Remove stale pm2_app_pids_status entries for pm_ids no longer in pm2.list()
+        if (metrics_1.metricAppPidsStatus) {
+            const gaugeData = metrics_1.metricAppPidsStatus.hashMap;
+            if (gaugeData) {
+                for (const key of Object.keys(gaugeData)) {
+                    const labels = (_a = gaugeData[key]) === null || _a === void 0 ? void 0 : _a.labels;
+                    if ((labels === null || labels === void 0 ? void 0 : labels.app) && (labels === null || labels === void 0 ? void 0 : labels.instance) !== undefined) {
+                        const lookupKey = `${labels.app}:${labels.instance}`;
+                        if (!currentPidStatuses.has(lookupKey)) {
+                            metrics_1.metricAppPidsStatus.remove(labels);
+                        }
+                    }
+                }
+            }
+        }
         Object.keys(APPS).forEach((appName) => {
             const processingApp = mapAppPids[appName];
             // Filters apps which do not have active pids

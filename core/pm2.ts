@@ -72,6 +72,7 @@ const detectActiveApps = () => {
         const pidsMonit: IPidsData = {};
         const mapAppPids: IAppData = {};
         const activePM2Ids = new Set<number>();
+        const currentPidStatuses = new Map<string, number>(); // "app:pm_id" → status
 
         apps.forEach((appInstance) => {
             const pm2_env = appInstance.pm2_env as pm2.Pm2Env;
@@ -116,7 +117,7 @@ const detectActiveApps = () => {
                 };
             }
 
-            // Track per-instance status separately (includes stopped/errored with pid=0)
+            // Track per-instance status (includes stopped/errored with pid=0)
             if (appInstance.pm_id !== undefined) {
                 const statusMap: Record<string, number> = {
                     'online': 1, 'one-launch-status': 1,
@@ -124,12 +125,30 @@ const detectActiveApps = () => {
                     'stopped': 3,
                     'errored': 4,
                 };
+                const statusValue = statusMap[pm2_env.status] ?? 0;
                 metricAppPidsStatus?.set(
                     { app: appName, instance: appInstance.pm_id },
-                    statusMap[pm2_env.status] ?? 0
+                    statusValue
                 );
+                currentPidStatuses.set(`${appName}:${appInstance.pm_id}`, statusValue);
             }
         });
+
+        // Remove stale pm2_app_pids_status entries for pm_ids no longer in pm2.list()
+        if (metricAppPidsStatus) {
+            const gaugeData = (metricAppPidsStatus as any).hashMap;
+            if (gaugeData) {
+                for (const key of Object.keys(gaugeData)) {
+                    const labels = gaugeData[key]?.labels;
+                    if (labels?.app && labels?.instance !== undefined) {
+                        const lookupKey = `${labels.app}:${labels.instance}`;
+                        if (!currentPidStatuses.has(lookupKey)) {
+                            metricAppPidsStatus.remove(labels);
+                        }
+                    }
+                }
+            }
+        }
 
         Object.keys(APPS).forEach((appName) => {
             const processingApp = mapAppPids[appName];
